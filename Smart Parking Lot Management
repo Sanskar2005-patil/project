@@ -1,0 +1,138 @@
+#include <iostream>
+#include <string>
+
+struct Car {
+    std::string licensePlate;
+    int slotNumber;
+    Car* next;
+};
+
+class ParkingLot {
+private:
+    int capacity;
+    bool* slots;       // dynamically allocated array to track free/occupied slots
+    Car* head;         // head of linked list of active parked cars
+
+public:
+    ParkingLot(int capacity) {
+        this->capacity = capacity;
+        slots = new bool[capacity];
+        for (int i = 0; i < capacity; ++i) slots[i] = false; // all slots free initially
+        head = nullptr;
+    }
+
+    ~ParkingLot() {
+        // Free linked list nodes
+        while (head) {
+            Car* temp = head;
+            head = head->next;
+            delete temp;
+        }
+        delete[] slots;
+    }
+
+    int findFreeSlot() {
+        for (int i = 0; i < capacity; ++i) {
+            if (!slots[i]) return i;
+        }
+        return -1; // no free slot
+    }
+
+    void parkCar(const std::string& licensePlate) {
+        if (findCar(licensePlate) != nullptr) {
+            std::cout << "Car with license plate " << licensePlate << " is already parked.\n";
+            return;
+        }
+
+        int freeSlot = findFreeSlot();
+        if (freeSlot == -1) {
+            std::cout << "Parking Lot Full! Cannot park car " << licensePlate << "\n";
+            return;
+        }
+
+        // Allocate new car node
+        Car* newCar = new Car{licensePlate, freeSlot, nullptr};
+
+        // Insert at the front of linked list
+        newCar->next = head;
+        head = newCar;
+
+        slots[freeSlot] = true;
+
+        std::cout << "Car " << licensePlate << " parked at slot " << freeSlot << "\n";
+    }
+
+    Car* findCar(const std::string& licensePlate) {
+        Car* curr = head;
+        while (curr) {
+            if (curr->licensePlate == licensePlate)
+                return curr;
+            curr = curr->next;
+        }
+        return nullptr;
+    }
+
+    void exitCar(const std::string& licensePlate) {
+        if (!head) {
+            std::cout << "Parking lot is empty.\n";
+            return;
+        }
+
+        Car* curr = head;
+        Car* prev = nullptr;
+
+        while (curr && curr->licensePlate != licensePlate) {
+            prev = curr;
+            curr = curr->next;
+        }
+
+        if (!curr) {
+            std::cout << "Car " << licensePlate << " not found in parking lot.\n";
+            return;
+        }
+
+        // Free the slot
+        slots[curr->slotNumber] = false;
+
+        // Remove node from linked list
+        if (prev) prev->next = curr->next;
+        else head = curr->next;
+
+        delete curr;
+        std::cout << "Car " << licensePlate << " has exited.\n";
+    }
+
+    void displayParkedCars() {
+        if (!head) {
+            std::cout << "Parking lot is empty.\n";
+            return;
+        }
+
+        std::cout << "Currently parked cars:\n";
+        Car* curr = head;
+        while (curr) {
+            std::cout << "Slot " << curr->slotNumber << ": " << curr->licensePlate << "\n";
+            curr = curr->next;
+        }
+    }
+};
+
+int main() {
+    ParkingLot lot(3); // Parking lot with 3 slots
+
+    lot.parkCar("ABC123");
+    lot.parkCar("XYZ789");
+    lot.parkCar("CAR456");
+    lot.parkCar("OVERFLOW1"); // Should report full
+
+    lot.displayParkedCars();
+
+    lot.exitCar("XYZ789");
+    lot.parkCar("NEW999"); // Slot freed, should succeed
+
+    lot.displayParkedCars();
+
+    lot.exitCar("NOTFOUND"); // Car not found
+
+    return 0;
+}
