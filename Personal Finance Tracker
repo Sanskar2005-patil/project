@@ -1,0 +1,150 @@
+#include <iostream>
+#include <vector>
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <map>
+#include <iomanip>
+
+struct Date {
+    int year, month, day;
+
+    bool operator<(const Date& other) const {
+        if (year != other.year) return year < other.year;
+        if (month != other.month) return month < other.month;
+        return day < other.day;
+    }
+
+    std::string toString() const {
+        std::ostringstream oss;
+        oss << year << "-";
+        if (month < 10) oss << "0";
+        oss << month << "-";
+        if (day < 10) oss << "0";
+        oss << day;
+        return oss.str();
+    }
+
+    static Date fromString(const std::string& s) {
+        Date d;
+        sscanf(s.c_str(), "%d-%d-%d", &d.year, &d.month, &d.day);
+        return d;
+    }
+};
+
+struct Transaction {
+    Date date;
+    std::string category;
+    double amount;
+    std::string type;  // "income" or "expense"
+};
+
+void addTransaction(std::vector<Transaction>& transactions, const std::string& dateStr,
+                    const std::string& category, double amount, const std::string& type) {
+    transactions.push_back({Date::fromString(dateStr), category, amount, type});
+}
+
+void sortByDate(std::vector<Transaction>& transactions) {
+    std::sort(transactions.begin(), transactions.end(),
+              [](const Transaction& a, const Transaction& b) {
+                  return a.date < b.date;
+              });
+}
+
+std::vector<Transaction> searchByCategory(const std::vector<Transaction>& transactions, const std::string& category) {
+    std::vector<Transaction> result;
+    for (const auto& t : transactions) {
+        if (t.category == category) result.push_back(t);
+    }
+    return result;
+}
+
+std::vector<Transaction> filterExpensesOver(const std::vector<Transaction>& transactions, double threshold) {
+    std::vector<Transaction> result;
+    for (const auto& t : transactions) {
+        if (t.type == "expense" && t.amount > threshold) result.push_back(t);
+    }
+    return result;
+}
+
+void saveTransactions(const std::vector<Transaction>& transactions, const std::string& filename) {
+    std::ofstream file(filename);
+    for (const auto& t : transactions) {
+        file << t.date.toString() << "," << t.category << "," << t.amount << "," << t.type << "\n";
+    }
+}
+
+std::vector<Transaction> loadTransactions(const std::string& filename) {
+    std::vector<Transaction> transactions;
+    std::ifstream file(filename);
+    if (!file) return transactions;
+
+    std::string line;
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
+        std::string dateStr, category, amountStr, type;
+        if (std::getline(ss, dateStr, ',') &&
+            std::getline(ss, category, ',') &&
+            std::getline(ss, amountStr, ',') &&
+            std::getline(ss, type)) {
+            addTransaction(transactions, dateStr, category, std::stod(amountStr), type);
+        }
+    }
+    return transactions;
+}
+
+void asciiBarChart(const std::vector<Transaction>& transactions) {
+    std::map<std::string, double> monthlySpending;
+    for (const auto& t : transactions) {
+        if (t.type == "expense") {
+            std::ostringstream month;
+            month << t.date.year << "-";
+            if (t.date.month < 10) month << "0";
+            month << t.date.month;
+            monthlySpending[month.str()] += t.amount;
+        }
+    }
+
+    std::cout << "\nMonthly Spending Chart:\n";
+    for (const auto& [month, amount] : monthlySpending) {
+        int bars = static_cast<int>(amount / 10);
+        std::cout << month << ": ";
+        for (int i = 0; i < bars; ++i) std::cout << "#";
+        std::cout << " ($" << std::fixed << std::setprecision(2) << amount << ")\n";
+    }
+}
+
+int main() {
+    std::vector<Transaction> transactions = loadTransactions("transactions.csv");
+
+    if (transactions.empty()) {
+        // Add some sample data if file is empty or missing
+        addTransaction(transactions, "2025-08-01", "Salary", 3000, "income");
+        addTransaction(transactions, "2025-08-05", "Groceries", 150.75, "expense");
+        addTransaction(transactions, "2025-08-10", "Utilities", 90.5, "expense");
+        addTransaction(transactions, "2025-09-01", "Salary", 3000, "income");
+        addTransaction(transactions, "2025-09-03", "Rent", 1200, "expense");
+        addTransaction(transactions, "2025-09-07", "Entertainment", 200, "expense");
+    }
+
+    sortByDate(transactions);
+
+    std::cout << "All Transactions:\n";
+    for (const auto& t : transactions) {
+        std::cout << t.date.toString() << " | " << t.category << " | $" << std::fixed << std::setprecision(2)
+                  << t.amount << " | " << t.type << "\n";
+    }
+
+    std::cout << "\nExpenses over $100:\n";
+    auto filtered = filterExpensesOver(transactions, 100);
+    for (const auto& t : filtered) {
+        std::cout << t.date.toString() << " | " << t.category << " | $" << t.amount << "\n";
+    }
+
+    asciiBarChart(transactions);
+
+    saveTransactions(transactions, "transactions.csv");
+
+    return 0;
+}
